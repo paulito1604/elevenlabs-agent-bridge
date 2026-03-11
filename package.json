@@ -1,8 +1,13 @@
 {
-  "ok": true,
-  "received": true,
-  "text": "Hola nuevamente 2",
-  "lead_id": 88125410,
-  "phone": null,
-  "reply": "Mensaje recibido: Hola nuevamente 2"
+  "name": "elevenlabs-agent-bridge",
+  "version": "1.0.0",
+  "description": "Bridge entre n8n y ElevenLabs",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
 }
