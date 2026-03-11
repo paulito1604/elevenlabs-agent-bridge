@@ -12,29 +12,17 @@ app.get("/", (req, res) => {
   });
 });
 
-app.post("/eleven-agent-chat", async (req, res) => {
-  try {
-    console.log("POST recibido:", req.body);
+app.post("/eleven-agent-chat", (req, res) => {
+  const { text } = req.body;
 
-    const { text, lead_id, phone } = req.body;
+  console.log("Mensaje recibido:", text);
 
-    return res.json({
-      ok: true,
-      received: true,
-      text: text || null,
-      lead_id: lead_id || null,
-      phone: phone || null,
-      reply: `Mensaje recibido: ${text || ""}`
-    });
-  } catch (error) {
-    console.error("ERROR EN /eleven-agent-chat:", error);
-    return res.status(500).json({
-      ok: false,
-      error: error.message
-    });
-  }
+  res.json({
+    ok: true,
+    reply: `Mensaje recibido: ${text}`
+  });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Bridge corriendo en puerto ${PORT}`);
+  console.log(`Servidor corriendo en puerto ${PORT}`);
 });
