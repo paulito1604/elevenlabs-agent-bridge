@@ -3,26 +3,48 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 app.get("/", (req, res) => {
-  res.json({
+  res.status(200).json({
     ok: true,
-    message: "Bridge activo"
+    service: "elevenlabs-agent-bridge",
+    status: "running"
   });
 });
 
-app.post("/eleven-agent-chat", (req, res) => {
-  const { text } = req.body;
+app.post("/eleven-agent-chat", async (req, res) => {
+  try {
 
-  console.log("Mensaje recibido:", text);
+    console.log("Body recibido:", req.body);
 
-  res.json({
-    ok: true,
-    reply: `Mensaje recibido: ${text}`
-  });
+    const { text, lead_id, phone } = req.body || {};
+
+    if (!text) {
+      return res.status(400).json({
+        error: "text es requerido"
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      reply: `Mensaje recibido: ${text}`,
+      lead_id: lead_id || null,
+      phone: phone || null
+    });
+
+  } catch (error) {
+
+    console.error("ERROR:", error);
+
+    return res.status(500).json({
+      error: "internal_error",
+      message: error.message
+    });
+
+  }
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`Bridge activo en puerto ${PORT}`);
 });
