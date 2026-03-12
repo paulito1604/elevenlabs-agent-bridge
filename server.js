@@ -101,12 +101,8 @@ app.post("/eleven-agent-chat", async (req, res) => {
       // Este payload puede variar si ElevenLabs cambia eventos;
       // por eso también guardamos eventos crudos para depurar.
       const payload = {
-        type: "user_message",
-        text,
-        metadata: {
-          lead_id,
-          phone,
-        },
+        type: "user_input",
+        text: text
       };
 
       console.log("Enviando al agente:", payload);
