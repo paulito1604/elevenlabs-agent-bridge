@@ -43,7 +43,13 @@ app.get("/", (req, res) => {
 });
 
 app.post("/eleven-agent-chat", async (req, res) => {
-  const { text, lead_id = null, phone = null } = req.body || {};
+  const {
+    text,
+    lead_id = null,
+    phone = null,
+    context = "",
+    conversation_id = null,
+  } = req.body || {};
 
   if (!text || typeof text !== "string") {
     return res.status(400).json({
@@ -57,6 +63,7 @@ app.post("/eleven-agent-chat", async (req, res) => {
   let finalText = "";
   let rawEvents = [];
   let initDone = false;
+  let activeConversationId = conversation_id || null;
 
   const safeReply = (status, payload) => {
     if (replied) return;
@@ -76,6 +83,7 @@ app.post("/eleven-agent-chat", async (req, res) => {
       ok: false,
       error: "Timeout esperando respuesta del agente",
       partial_text: finalText || "",
+      conversation_id: activeConversationId,
       events_seen: rawEvents.slice(-20),
     });
   }, 25000);
@@ -116,7 +124,6 @@ app.post("/eleven-agent-chat", async (req, res) => {
         return;
       }
 
-      // Responder pong a cada ping
       if (event.type === "ping" && event.ping_event?.event_id) {
         const pong = {
           type: "pong",
@@ -127,19 +134,31 @@ app.post("/eleven-agent-chat", async (req, res) => {
         return;
       }
 
-      // Cuando llegue metadata de inicio, mandar el texto del usuario
       if (
         !initDone &&
-        (
-          event.type === "conversation_initiation_metadata" ||
-          event.conversation_initiation_metadata
-        )
+        (event.type === "conversation_initiation_metadata" ||
+          event.conversation_initiation_metadata)
       ) {
         initDone = true;
 
+        const metadata =
+          event.conversation_initiation_metadata_event ||
+          event.conversation_initiation_metadata ||
+          {};
+
+        // Intentar capturar conversation_id si ElevenLabs lo envía
+        activeConversationId =
+          metadata.conversation_id ||
+          metadata.conversationId ||
+          activeConversationId;
+
+        const messageForAgent = context?.trim()
+          ? `Contexto de conversación:\n${context}\n\nMensaje actual del cliente:\n${text}`
+          : text;
+
         const userMessage = {
           type: "user_message",
-          text: text,
+          text: messageForAgent,
         };
 
         console.log("Enviando user_message:", JSON.stringify(userMessage));
@@ -147,7 +166,6 @@ app.post("/eleven-agent-chat", async (req, res) => {
         return;
       }
 
-      // Capturar respuesta del agente
       if (event.type === "agent_response") {
         const piece =
           event.agent_response_event?.agent_response ||
@@ -155,11 +173,19 @@ app.post("/eleven-agent-chat", async (req, res) => {
           event.text ||
           "";
 
-        if (piece) {
+        // Intentar capturar conversation_id si viene en algún evento
+        activeConversationId =
+          event.conversation_id ||
+          event.conversationId ||
+          event.agent_response_event?.conversation_id ||
+          activeConversationId;
+
+        if (piece && !finalText.trim()) {
+          finalText = piece;
+        } else if (piece && finalText.trim() !== piece.trim()) {
           finalText += piece;
         }
 
-        // En chat mode, si ya llegó texto útil, devolvemos
         if (finalText.trim()) {
           clearTimeout(timeout);
           return safeReply(200, {
@@ -168,13 +194,16 @@ app.post("/eleven-agent-chat", async (req, res) => {
             text: finalText.trim(),
             lead_id,
             phone,
+            conversation_id: activeConversationId,
             debug_last_event: event,
           });
         }
       }
 
-      // Algunas implementaciones mandan transcript o otros eventos intermedios
-      if (event.type === "user_transcript" || event.type === "agent_response_correction") {
+      if (
+        event.type === "user_transcript" ||
+        event.type === "agent_response_correction"
+      ) {
         return;
       }
     });
@@ -185,6 +214,7 @@ app.post("/eleven-agent-chat", async (req, res) => {
       return safeReply(500, {
         ok: false,
         error: `WebSocket error: ${error.message}`,
+        conversation_id: activeConversationId,
         events_seen: rawEvents.slice(-20),
       });
     });
@@ -200,6 +230,7 @@ app.post("/eleven-agent-chat", async (req, res) => {
           text: finalText || "",
           lead_id,
           phone,
+          conversation_id: activeConversationId,
           close_code: code,
           close_reason: reason?.toString?.() || "",
           events_seen: rawEvents.slice(-20),
@@ -211,6 +242,7 @@ app.post("/eleven-agent-chat", async (req, res) => {
     return safeReply(500, {
       ok: false,
       error: error.message,
+      conversation_id: activeConversationId,
       events_seen: rawEvents.slice(-20),
     });
   }
